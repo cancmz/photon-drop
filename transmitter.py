@@ -53,12 +53,14 @@ def save_one_single_qr(payload_text, save_path, qr_version=QR_VERSION,):
     img.save(save_path)
 
 file_path = browse_all_files()
-file_name=Path(file_path).name
-file_size = os.path.getsize(file_path)
-encoded_string=encode_file_to_base64(file_path)
-chunks=bs64_to_chunks(encoded_string)
-create_and_save_qr_code(chunks, file_name, file_size, file_name)
-
+if file_path:
+    file_name=Path(file_path).name
+    file_size = os.path.getsize(file_path)
+    encoded_string=encode_file_to_base64(file_path)
+    chunks=bs64_to_chunks(encoded_string)
+    create_and_save_qr_code(chunks, file_name, file_size, file_name)
+else:
+    print("No file selected.")
 
 
 """img.save(f"version_{qr_version}_qr.png")
