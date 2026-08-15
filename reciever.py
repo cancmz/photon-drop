@@ -2,6 +2,7 @@ import base64
 import os
 import sys
 
+import base45
 import cv2
 import zxingcpp
 class QrCode:
@@ -51,16 +52,18 @@ def scan_qr_code_and_start_process():
     cv2.destroyAllWindows()
 
 def decode_qr_code(text):
-    data=text.strip()
-    parameters=data.split('|')
+    parameters=text.split('|')
     scanned_qr_code=None
     if len(parameters)==5:
         scanned_qr_code=QrCode("hdr", parameters[1], parameters[2], parameters[3], parameters[4], None, None)
-
-    elif len(parameters)==2:
-        scanned_qr_code=QrCode("data", None, -1, None, None, parameters[1], parameters[0])
     else:
-        print("Invalid QR code format.")
+        chunk_payload = text[4:]
+        packet_id = text[:4]
+        if packet_id.isdigit():
+            packet_id = int(packet_id)
+            scanned_qr_code = QrCode("data", None, None, None, None, chunk_payload, packet_id)
+        else:
+            print("Invalid Packet Format")
 
     if scanned_qr_code is not None:
         create_dictionary_of_qr_codes(scanned_qr_code)
@@ -100,7 +103,7 @@ def create_file_from_dict(dictionary_of_qr_codes):
             f"There are missing packages. Total expected: {total_packets}, missed: {missing_keys}"
         )
     full_b64_str = "".join(dictionary_of_qr_codes[f"id_{i}"] for i in range(total_packets))
-    raw_bytes = base64.b64decode(full_b64_str)
+    raw_bytes = base45.b45decode(full_b64_str)
     if expected_size > 0 and len(raw_bytes) != expected_size:
         print(
             f"Warning: File size does not match. Expected: {expected_size}, Real: {len(raw_bytes)}"
