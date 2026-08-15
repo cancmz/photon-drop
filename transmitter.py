@@ -1,5 +1,4 @@
 import base64
-import math
 import os
 import qrcode
 import tkinter as tk
@@ -13,13 +12,11 @@ def browse_all_files():
     root = tk.Tk()
     root.withdraw()
 
-    # Open the file dialog box
-    file_path = filedialog.askopenfilename(
-        title="Select a File",
-        filetypes=[("All Files", "*.*")]  # This forces it to show all extensions
-    )
+    # Open the file dialog box (filetypes kaldırıldı)
+    file_path = filedialog.askopenfilename(title="Select a File")
 
     return file_path
+
 
 def encode_file_to_base64(file_path):
     with open(file_path, "rb") as file:
