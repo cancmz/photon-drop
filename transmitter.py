@@ -1,4 +1,3 @@
-import base64
 import base45
 import os
 import qrcode
@@ -20,12 +19,12 @@ def browse_all_files():
 
     return file_path
 
-def encode_file_to_base64(file_path):
+def encode_file_to_base45(file_path):
     with open(file_path, "rb") as file:
         encoded_string=base45.b45encode(file.read()).decode("utf-8")
         return encoded_string
 
-def bs64_to_chunks(encoded_data, qr_version=QR_VERSION):
+def bs45_to_chunks(encoded_data, qr_version=QR_VERSION):
     capacity = 1014 if qr_version == 25 else 3380
     chunks=[encoded_data[i:i+capacity] for i in range(0, len(encoded_data), capacity)]
     return chunks
@@ -51,8 +50,8 @@ file_path = browse_all_files()
 if file_path:
     file_name=Path(file_path).name
     file_size = os.path.getsize(file_path)
-    encoded_string=encode_file_to_base64(file_path)
-    chunks=bs64_to_chunks(encoded_string)
+    encoded_string= encode_file_to_base45(file_path)
+    chunks= bs45_to_chunks(encoded_string)
     create_and_save_qr_code(chunks, file_name, file_size, file_name)
 else:
     print("No file selected.")

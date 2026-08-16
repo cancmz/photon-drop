@@ -1,7 +1,4 @@
-import base64
 import os
-import sys
-
 import base45
 import cv2
 import zxingcpp
@@ -102,8 +99,8 @@ def create_file_from_dict(dictionary_of_qr_codes):
         raise ValueError(
             f"There are missing packages. Total expected: {total_packets}, missed: {missing_keys}"
         )
-    full_b64_str = "".join(dictionary_of_qr_codes[f"id_{i}"] for i in range(total_packets))
-    raw_bytes = base45.b45decode(full_b64_str)
+    full_b45_str = "".join(dictionary_of_qr_codes[f"id_{i}"] for i in range(total_packets))
+    raw_bytes = base45.b45decode(full_b45_str)
     if expected_size > 0 and len(raw_bytes) != expected_size:
         print(
             f"Warning: File size does not match. Expected: {expected_size}, Real: {len(raw_bytes)}"
