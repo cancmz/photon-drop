@@ -40,7 +40,7 @@ def scan_qr_code_and_start_process():
             text = result.text
             decode_qr_code(text)
 
-        cv2.imshow("Version 40 Canlı QR Okuyucu", frame)
+        cv2.imshow("Version-40 Live QR Code Scanner", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -81,7 +81,7 @@ def create_dictionary_of_qr_codes(qr_code):
             print("All datas read (100%)")
             scan_is_done=True
         else:
-            print(f"{round((len(dictionary_of_qr_codes)-4)/int(dictionary_of_qr_codes['total_packet_number'])*100)}%")
+            print(f"{round((len(dictionary_of_qr_codes)-4)/int(dictionary_of_qr_codes['total_packet_number'])*100,2)}%")
     else:
         print("Scaning proccses is started but because there is no header data, deatils are missed.")
     if scan_is_done:

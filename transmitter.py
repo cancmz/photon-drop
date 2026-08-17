@@ -2,9 +2,10 @@ import base45
 import os
 import qrcode
 import tkinter as tk
+import segno
+import show_qr
 from tkinter import filedialog
 from pathlib import Path
-import segno
 
 QR_VERSION=40
 qr_header = qrcode.QRCode(version=QR_VERSION, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
@@ -41,8 +42,8 @@ def create_and_save_qr_code(chunk, file_name, file_size, output_folder):
         save_one_single_qr(data_qr_payload, data_qr_path)
         counter+=1
         print(round(counter / len(chunk) * 100, 2))
-
-def save_one_single_qr(payload_text, save_path, qr_version=QR_VERSION,):
+    return output_folder
+def save_one_single_qr(payload_text, save_path, qr_version=QR_VERSION):
     qr = segno.make(payload_text, error="m", version=40)
     qr.save(save_path, scale=4, border=2)
 
@@ -52,10 +53,7 @@ if file_path:
     file_size = os.path.getsize(file_path)
     encoded_string= encode_file_to_base45(file_path)
     chunks= bs45_to_chunks(encoded_string)
-    create_and_save_qr_code(chunks, file_name, file_size, file_name)
+    folder_path=create_and_save_qr_code(chunks, file_name, file_size, file_name)
+    show_qr.fast_photo_slideshow(folder_path, 50)
 else:
     print("No file selected.")
-
-
-"""img.save(f"version_{qr_version}_qr.png")
-print("Successfully generated 'version_40_qr.png' using Version 40 matrix!")"""
