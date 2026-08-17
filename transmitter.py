@@ -11,13 +11,9 @@ QR_VERSION=40
 qr_header = qrcode.QRCode(version=QR_VERSION, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
 
 def browse_all_files():
-    # Create an invisible root window to prevent an empty Tkinter window from appearing
     root = tk.Tk()
     root.withdraw()
-
-    # Open the file dialog box (filetypes kaldırıldı)
     file_path = filedialog.askopenfilename(title="Select a File")
-
     return file_path
 
 def encode_file_to_base45(file_path):
@@ -43,6 +39,7 @@ def create_and_save_qr_code(chunk, file_name, file_size, output_folder):
         counter+=1
         print(round(counter / len(chunk) * 100, 2))
     return output_folder
+
 def save_one_single_qr(payload_text, save_path, qr_version=QR_VERSION):
     qr = segno.make(payload_text, error="m", version=40)
     qr.save(save_path, scale=4, border=2)

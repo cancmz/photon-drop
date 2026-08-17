@@ -39,7 +39,8 @@ def scan_qr_code_and_start_process():
         for result in results:
             text = result.text
             decode_qr_code(text)
-
+        if scan_is_done:
+            break
         cv2.imshow("Version-40 Live QR Code Scanner", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
