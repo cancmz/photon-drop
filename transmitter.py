@@ -1,3 +1,7 @@
+import lzma
+import shutil
+from typing import Optional
+
 import base45
 import os
 import qrcode
@@ -15,6 +19,20 @@ def browse_all_files():
     root.withdraw()
     file_path = filedialog.askopenfilename(title="Select a File")
     return file_path
+
+def compress_file_lzma(file_path: str, compression_level: int = 9) -> Optional[str]:
+    if not os.path.isfile(file_path):
+        return None
+
+    output_path = f"{file_path}.xz"
+
+    with open(file_path, "rb") as f_in:
+        with lzma.open(
+            output_path, "wb", preset=compression_level
+        ) as f_compressed:
+            shutil.copyfileobj(f_in, f_compressed)
+
+    return os.path.abspath(output_path)
 
 def encode_file_to_base45(file_path):
     with open(file_path, "rb") as file:
@@ -48,9 +66,14 @@ file_path = browse_all_files()
 if file_path:
     file_name=Path(file_path).name
     file_size = os.path.getsize(file_path)
+    compressed_file_path=compress_file_lzma(file_path, compression_level=9)
+    compressed_file_size=os.path.getsize(compressed_file_path)
+    if (compressed_file_size/file_size)*100<=80:
+        file_path=compressed_file_path
+        print("The file is compressed.")
     encoded_string= encode_file_to_base45(file_path)
     chunks= bs45_to_chunks(encoded_string)
     folder_path=create_and_save_qr_code(chunks, file_name, file_size, file_name)
-    show_qr.fast_photo_slideshow(folder_path, 50)
+    show_qr.fast_photo_slideshow(folder_path, 42)
 else:
     print("No file selected.")
