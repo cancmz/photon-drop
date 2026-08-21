@@ -71,6 +71,9 @@ if file_path:
     if (compressed_file_size/file_size)*100<=80:
         file_path=compressed_file_path
         print("The file is compressed.")
+    else:
+        os.remove(compressed_file_path)
+        print("The file is not compressed.")
     encoded_string= encode_file_to_base45(file_path)
     chunks= bs45_to_chunks(encoded_string)
     folder_path=create_and_save_qr_code(chunks, file_name, file_size, file_name)
