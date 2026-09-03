@@ -5,14 +5,17 @@ from core.models import QrHeader, ReceptionStatus, QrChunk
 
 class QrDecoderEngine:
     def __init__(self):
+        self.this_qr_valid = None
         self.reset()
 
     def reset(self):
         self.header: Optional[QrHeader] = None
         self.chunks: Dict[int, str] = {}
         self.received_indices: Set[int] = set()
+        self.this_qr_valid: bool = None
 
     def parse_payload(self, text: str,)-> ReceptionStatus:
+        self.this_qr_valid = True
         parts=text.split("|")
         if len(parts)==5 and parts[0]=="HDR":
             self.header = QrHeader(
@@ -27,7 +30,8 @@ class QrDecoderEngine:
             if idx not in self.chunks:
                 self.chunks[idx]=payload
                 self.received_indices.add(idx)
-
+        else:
+            self.this_qr_valid=False
         return self.get_status()
 
     def get_status(self) -> ReceptionStatus:
@@ -37,7 +41,8 @@ class QrDecoderEngine:
                 collected_chunks=len(self.chunks),
                 total_chunks=None,
                 percentage=0.0,
-                is_complete=False
+                is_complete=False,
+                is_this_qr_valid=self.this_qr_valid
             )
         total=self.header.total_chunks
         collected=len(self.chunks)
@@ -48,7 +53,8 @@ class QrDecoderEngine:
             collected_chunks=collected,
             total_chunks=total,
             percentage=pct,
-            is_complete=(collected == total)
+            is_complete=(collected == total),
+            is_this_qr_valid = self.this_qr_valid
         )
 
     def assemble_to_bytes(self):

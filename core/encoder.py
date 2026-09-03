@@ -12,7 +12,7 @@ class QrEncoderEngine:
         self.qr_version = qr_version
         self.error_level = error_level
 
-    def proccess_file_comperssion(self, file_path: str, compression_level: int = 9)->Tuple[bytes, bool]:
+    def read_raw_bytes_and_proccess_file_comperssion(self, file_path: str, compression_level: int = 9)->Tuple[bytes, bool]:
         with open(file_path, "rb") as f:
             raw_bytes=f.read()
         compressed=lzma.compress(raw_bytes, preset=compression_level)

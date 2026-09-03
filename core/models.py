@@ -26,3 +26,4 @@ class ReceptionStatus:
     total_chunks: Optional[int]
     percentage: float
     is_complete: bool
+    is_this_qr_valid: bool
