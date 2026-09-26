@@ -25,12 +25,18 @@ class EncodeThread(QThread):
         self.file_path = file_path
         self.encoder = QrEncoderEngine(qr_version=qr_version)
         self.is_it_encoded = None
+        self._is_cancelled = False
+
+    def cancel(self):
+        self._is_cancelled = True
 
     def run(self):
         try:
             file_name = Path(self.file_path).name
             # Dosya yolunu parametre olarak geçiyoruz
             raw_bytes, self.is_it_encoded = self.encoder.read_raw_bytes_and_proccess_file_comperssion(self.file_path)
+            if self._is_cancelled:
+                return
             chunks = self.encoder.to_base45_chunks(raw_bytes)
 
             total_qr_codes = len(chunks) + 1
@@ -44,13 +50,18 @@ class EncodeThread(QThread):
 
             # Data Frames
             for index, chunk in enumerate(chunks):
+                if self._is_cancelled:
+                    return
                 chunk_text = self.encoder.build_chunk_payload(index, chunk)
                 png_bytes = self.encoder.generate_qr_svg_or_png_bytes(chunk_text)
                 pixmaps.append(_bytes_to_pixmap(png_bytes))
                 self.progress.emit(int(((index + 2) / total_qr_codes) * 100))
 
-            self.finished_pixmap_list.emit(pixmaps)
+            if not self._is_cancelled:
+                self.finished_pixmap_list.emit(pixmaps)
         except Exception as e:
+            import traceback
+            traceback.print_exc()  # Hatanın tam dosya ve satır numarasını konsola basar
             self.error.emit(str(e))
 
 
@@ -74,6 +85,11 @@ class TransmitTab(QWidget):
         self.btn_select.clicked.connect(self._select_file)
         top_layout.addWidget(self.btn_select)
 
+        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setEnabled(False)
+        self.btn_cancel.clicked.connect(self._cancel_encoding)
+        top_layout.addWidget(self.btn_cancel)
+
         self.btn_play_pause = QPushButton("Stop Playing")
         self.btn_play_pause.setEnabled(False)
         self.btn_play_pause.clicked.connect(self._toggle_slideshow)
@@ -95,7 +111,7 @@ class TransmitTab(QWidget):
         self.progress_bar.setValue(0)
         layout.addWidget(self.progress_bar)
 
-        self.lbl_counter = QLabel("Hazır")
+        self.lbl_counter = QLabel("Ready when you are!")
         self.lbl_counter.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_counter)
 
@@ -129,6 +145,8 @@ class TransmitTab(QWidget):
 
     def _on_error(self, msg: str):
         self.btn_select.setEnabled(True)
+        self.btn_cancel.setEnabled(False)  # <-- Hata aldığında da Cancel pasif olmalı
+        self.btn_play_pause.setEnabled(False)
         QMessageBox.critical(self, "Error", f"QR codes are not generated. Error details:\n{msg}")
         self.lbl_counter.setText("An error occured.")
 
@@ -138,10 +156,38 @@ class TransmitTab(QWidget):
 
         self.btn_select.setEnabled(True)
         self.btn_play_pause.setEnabled(True)
+        self.btn_cancel.setEnabled(False)  # <-- Burası: İşlem bitti, artık iptal edilemez
         self.btn_play_pause.setText("Stop Playing")
 
         self.timer.start(self.spin_interval.value())
         self._show_frame()
+
+    def _cancel_encoding(self):
+        if self.thread and self.thread.isRunning():
+            try:
+                self.thread.progress.disconnect()
+                self.thread.finished_pixmap_list.disconnect()
+            except TypeError:
+                pass
+
+            self.thread.cancel()
+            self.thread.wait()
+
+        self.slides.clear()
+        self.current_idx = 0
+
+        self.progress_bar.setValue(0)
+        self.progress_bar.repaint()
+
+        self.qr_viewport.clear()
+        self.qr_viewport.setText("No QR generated yet")
+        self.qr_viewport.repaint()
+
+        self.lbl_counter.setText("Generation Cancelled. System is Ready.")
+
+        self.btn_select.setEnabled(True)
+        self.btn_cancel.setEnabled(False)
+        self.btn_play_pause.setEnabled(False)
 
     def _select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
@@ -150,6 +196,8 @@ class TransmitTab(QWidget):
 
         self.btn_select.setEnabled(False)
         self.btn_play_pause.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+
         self.timer.stop()
         self.progress_bar.setValue(0)
         self.lbl_counter.setText("QR Codes Are Being Generated...")
@@ -158,9 +206,9 @@ class TransmitTab(QWidget):
         self.thread.progress.connect(self.progress_bar.setValue)
         self.thread.finished_pixmap_list.connect(self._on_encoded)
         self.thread.error.connect(self._on_error)
-
-        # run() yerine start() ile thread başlatıyoruz
         self.thread.start()
+
+
 
 
 if __name__ == "__main__":
