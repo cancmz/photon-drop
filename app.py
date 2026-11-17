@@ -31,4 +31,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # Windows ("spawn") ve PyInstaller icin sart: worker process'ler uygulamayi
+    # yeniden baslatmasin.
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()

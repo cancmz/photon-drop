@@ -101,20 +101,20 @@ class EncodeThread(QThread):
             total_qr_codes = len(chunks) + 1
             pixmaps: List[QPixmap] = []
 
-            # Header Frame
-            hdr_text = self.encoder.build_header_payload(file_name, len(raw_bytes), len(chunks))
-            hdr_png = self.encoder.generate_qr_svg_or_png_bytes(hdr_text)
-            pixmaps.append(_bytes_to_pixmap(hdr_png))
-            self.progress.emit(int((1 / total_qr_codes) * 100))
+            # Frame 0 = header, sonrasi data frame'leri. Hepsi tek listede; PNG'ler
+            # birden fazla cekirdekte uretilir ama iter_png_bytes sirayi korur.
+            payloads = [self.encoder.build_header_payload(file_name, len(raw_bytes), len(chunks))]
+            payloads += [self.encoder.build_chunk_payload(i, c) for i, c in enumerate(chunks)]
 
-            # Data Frames
-            for index, chunk in enumerate(chunks):
-                if self._is_cancelled:
-                    return
-                chunk_text = self.encoder.build_chunk_payload(index, chunk)
-                png_bytes = self.encoder.generate_qr_svg_or_png_bytes(chunk_text)
-                pixmaps.append(_bytes_to_pixmap(png_bytes))
-                self.progress.emit(int(((index + 2) / total_qr_codes) * 100))
+            png_iter = self.encoder.iter_png_bytes(payloads)
+            try:
+                for done, png_bytes in enumerate(png_iter, start=1):
+                    if self._is_cancelled:
+                        return
+                    pixmaps.append(_bytes_to_pixmap(png_bytes))
+                    self.progress.emit(int((done / total_qr_codes) * 100))
+            finally:
+                png_iter.close()  # iptalde bekleyen islerin havuzdan temizlenmesi
 
             if not self._is_cancelled:
                 self.finished_pixmap_list.emit(pixmaps)
