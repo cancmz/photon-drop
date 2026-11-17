@@ -8,8 +8,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Photondrop")
-        self.resize(600, 720)
-
+        self.resize(540, 648)
+        self.setMinimumSize(540, 648)
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
@@ -19,12 +19,10 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.transmit_tab, "Transmit")
         self.tabs.addTab(self.receive_tab, "Receive")
 
-
-
 def main():
     app = QApplication(sys.argv)
 
-    app.setStyle("Macintosh")
+    app.setStyle("Material")
 
     window = MainWindow()
     window.show()

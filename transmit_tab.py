@@ -2,18 +2,77 @@ from pathlib import Path
 from typing import List, Optional
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QProgressBar, QFileDialog, QSpinBox, QMessageBox
+    QProgressBar, QFileDialog, QSpinBox, QMessageBox, QSizePolicy
 )
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal
 from core.encoder import QrEncoderEngine
-
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, QSize
 
 def _bytes_to_pixmap(png_bytes: bytes) -> QPixmap:
     img = QImage()
     img.loadFromData(png_bytes, "PNG")
     return QPixmap.fromImage(img)
 
+class SquareQRLabel(QLabel):
+    """A QLabel that always stays square, scales to fit available space,
+    and never stretches its pixmap (crisp QR rendering)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._pixmap: QPixmap | None = None
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setScaledContents(False)  # we scale manually, preserving AR
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+        self.setMinimumSize(1, 1)
+
+    def setQrPixmap(self, pixmap: QPixmap):
+        self._pixmap = pixmap
+        self._rescale()
+
+    # --- keep the widget itself square within whatever space it's given ---
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._rescale()
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return width  # enforce 1:1
+
+    def sizeHint(self) -> QSize:
+        # start from whatever space the parent currently offers
+        side = min(self.width(), self.height()) if self.width() and self.height() else 300
+        return QSize(side, side)
+
+    def _rescale(self):
+        if self._pixmap is None or self._pixmap.isNull():
+            return
+        side = min(self.width(), self.height())
+        if side <= 0:
+            return
+        scaled = self._pixmap.scaled(
+            side, side,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,  # avoid smoothing/blurring QR modules
+        )
+        super().setPixmap(scaled)
+
+class SquareContainer(QWidget):
+    """Centers a child widget as the largest square that fits."""
+
+    def __init__(self, child: QWidget, parent=None):
+        super().__init__(parent)
+        self.child = child
+        child.setParent(self)
+
+    def resizeEvent(self, event):
+        side = min(self.width(), self.height())
+        x = (self.width() - side) // 2
+        y = (self.height() - side) // 2
+        self.child.setGeometry(x, y, side, side)
+        super().resizeEvent(event)
 
 class EncodeThread(QThread):
     progress = pyqtSignal(int)
@@ -64,7 +123,6 @@ class EncodeThread(QThread):
             traceback.print_exc()  # Hatanın tam dosya ve satır numarasını konsola basar
             self.error.emit(str(e))
 
-
 class TransmitTab(QWidget):
     def __init__(self):
         super().__init__()
@@ -85,10 +143,10 @@ class TransmitTab(QWidget):
         self.btn_select.clicked.connect(self._select_file)
         top_layout.addWidget(self.btn_select)
 
-        self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.clicked.connect(self._cancel_encoding)
-        top_layout.addWidget(self.btn_cancel)
+        self.btn_refresh = QPushButton("Refresh")
+        self.btn_refresh.setEnabled(True)  # her zaman aktif
+        self.btn_refresh.clicked.connect(self._reset_system)
+        top_layout.addWidget(self.btn_refresh)
 
         self.btn_play_pause = QPushButton("Stop Playing")
         self.btn_play_pause.setEnabled(False)
@@ -100,7 +158,7 @@ class TransmitTab(QWidget):
         speed_layout.addWidget(QLabel("Frame Range (ms):"))
         self.spin_interval = QSpinBox()
         self.spin_interval.setRange(20, 1000)
-        self.spin_interval.setValue(50)
+        self.spin_interval.setValue(40)
         self.spin_interval.valueChanged.connect(
             lambda v: self.timer.setInterval(v) if self.timer.isActive() else None
         )
@@ -115,12 +173,13 @@ class TransmitTab(QWidget):
         self.lbl_counter.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_counter)
 
-        self.qr_viewport = QLabel()
-        self.qr_viewport.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.qr_viewport = SquareQRLabel()
         self.qr_viewport.setMinimumSize(420, 420)
         self.qr_viewport.setStyleSheet("background-color: #111; border-radius: 8px;")
-        self.qr_viewport.setScaledContents(True)
-        layout.addWidget(self.qr_viewport, stretch=1)
+        self.qr_container = SquareContainer(self.qr_viewport)
+        self.qr_container.setStyleSheet("background-color: transparent;")
+        layout.addWidget(self.qr_container, stretch=1)
+        self.qr_viewport.setText("No QR generated yet")
 
     def _next_frame(self):
         if not self.slides:
@@ -139,13 +198,12 @@ class TransmitTab(QWidget):
     def _show_frame(self):
         if not self.slides:
             return
-        self.qr_viewport.setPixmap(self.slides[self.current_idx])
+        self.qr_viewport.setQrPixmap(self.slides[self.current_idx])
         label = "HEADER" if self.current_idx == 0 else f"DATA #{self.current_idx - 1}"
         self.lbl_counter.setText(f"Frame: {self.current_idx + 1} / {len(self.slides)} [{label}]")
 
     def _on_error(self, msg: str):
         self.btn_select.setEnabled(True)
-        self.btn_cancel.setEnabled(False)  # <-- Hata aldığında da Cancel pasif olmalı
         self.btn_play_pause.setEnabled(False)
         QMessageBox.critical(self, "Error", f"QR codes are not generated. Error details:\n{msg}")
         self.lbl_counter.setText("An error occured.")
@@ -156,23 +214,28 @@ class TransmitTab(QWidget):
 
         self.btn_select.setEnabled(True)
         self.btn_play_pause.setEnabled(True)
-        self.btn_cancel.setEnabled(False)  # <-- Burası: İşlem bitti, artık iptal edilemez
         self.btn_play_pause.setText("Stop Playing")
 
         self.timer.start(self.spin_interval.value())
         self._show_frame()
 
-    def _cancel_encoding(self):
+    def _reset_system(self):
+        """Sistemi her durumdan (encoding, oynatma, hata, boşta) tek tuşla
+        kullanıma hazır başlangıç durumuna döndürür."""
+        self.timer.stop()
+
         if self.thread and self.thread.isRunning():
             try:
                 self.thread.progress.disconnect()
                 self.thread.finished_pixmap_list.disconnect()
+                self.thread.error.disconnect()
             except TypeError:
                 pass
 
             self.thread.cancel()
             self.thread.wait()
 
+        self.thread = None
         self.slides.clear()
         self.current_idx = 0
 
@@ -183,11 +246,12 @@ class TransmitTab(QWidget):
         self.qr_viewport.setText("No QR generated yet")
         self.qr_viewport.repaint()
 
-        self.lbl_counter.setText("Generation Cancelled. System is Ready.")
+        self.lbl_counter.setText("Ready when you are!")
 
         self.btn_select.setEnabled(True)
-        self.btn_cancel.setEnabled(False)
+        self.btn_refresh.setEnabled(True)
         self.btn_play_pause.setEnabled(False)
+        self.btn_play_pause.setText("Stop playing")
 
     def _select_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Select File")
@@ -196,7 +260,6 @@ class TransmitTab(QWidget):
 
         self.btn_select.setEnabled(False)
         self.btn_play_pause.setEnabled(False)
-        self.btn_cancel.setEnabled(True)
 
         self.timer.stop()
         self.progress_bar.setValue(0)
@@ -220,7 +283,9 @@ if __name__ == "__main__":
 
     window = TransmitTab()
     window.setWindowTitle("Transmitter Test Penceresi")
-    window.resize(500, 600)
+    window.resize(540, 648)
+    window.setMinimumSize(540, 648)
+
     window.show()
 
     sys.exit(app.exec())
